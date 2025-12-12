@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API 模拟侧边栏</title>
+    <link rel="stylesheet" href="sidebar.css">
+</head>
+<body>
+    <div class="container">
+        <h1>API 模拟管理器</h1>
+        
+        <!-- 新建模拟表单 -->
+        <div class="form-section">
+            <h2>新建模拟</h2>
+            <form id="mockForm">
+                <div class="form-group">
+                    <label for="urlInput">URL：</label>
+                    <input type="text" id="urlInput" placeholder="https://example.com/api?MT=GET 或 /api" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="methodSelect">请求方法：</label>
+                    <select id="methodSelect">
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="DELETE">DELETE</option>
+                        <option value="PATCH">PATCH</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="responseInput" class="with-tip">
+                        响应结构：
+                        <span class="tip-icon" title="支持两种响应结构：
+1. 带@注释的结构：{
+'@ResponseStatus': '/* 注释 */',
+    'ResponseStatus': {
+        '@ErrorModule': '/* 注释 */',
+        'ErrorModule': 0,
+        '@ErrorCode': '/* 注释 */',
+        'ErrorCode': 0
+    }
+}
+
+2. 直接JSON结构：{
+    'ResponseStatus': {
+        'ErrorModule': 0,
+        'ErrorCode': 0
+    }
+}">
+                            ?
+                        </span>
+                    </label>
+                    <textarea id="responseInput" rows="10" placeholder='{
+  "ResponseStatus": {
+    "ErrorModule": 0,
+    "ErrorCode": 0
+  }
+}' required></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit">生成模拟</button>
+                    <button type="button" id="aiMockBtn" disabled>AI 生成模拟</button>
+                </div>
+            </form>
+        </div>
+        
+        <!-- 生成的模拟数据 -->
+        <div class="mock-data-section" style="display: none;">
+            <h2>生成的模拟数据</h2>
+            <div id="mockDataContainer"></div>
+            <div class="form-actions">
+                <button id="saveMockBtn">保存模拟</button>
+            </div>
+        </div>
+        
+        <!-- 已保存的模拟列表 -->
+        <div class="saved-mocks-section">
+            <h2>已保存的模拟</h2>
+            
+            <!-- 全局控制 -->
+            <div class="global-controls">
+                <div class="global-toggle">
+                    <label for="globalToggle">全局模拟开关：</label>
+                    <input type="checkbox" id="globalToggle" checked>
+                </div>
+                
+                <div class="har-import">
+                    <label for="harFileInput" class="har-import-icon" title="导入HAR">
+                        <img src="icons/导入HAR.png" alt="导入HAR" width="24" height="24">
+                    </label>
+                    <input type="file" id="harFileInput" accept=".har" style="display: none;">
+                </div>
+            </div>
+            
+            <div id="savedMocksList"></div>
+        </div>
+    </div>
+    
+    <script src="js/ai-mock.js"></script>
+    <script src="js/sidebar.js"></script>
+</body>
+</html>
