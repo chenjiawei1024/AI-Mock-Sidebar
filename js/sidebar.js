@@ -178,223 +178,714 @@ function processUrl(url, method) {
   return `${processedPath}?MT=${mtParam.toUpperCase()}`;
 }
 
-// 渲染带有可折叠部分和数组管理功能的模拟数据编辑器
+// 渲染VSCode风格的JSON编辑器
 function renderMockDataEditor(mockData, parentElement, path = '') {
   parentElement.innerHTML = '';
   
-  for (const key in mockData) {
-    const value = mockData[key];
-    const currentPath = path ? `${path}.${key}` : key;
-    
-    const fieldContainer = document.createElement('div');
-    fieldContainer.className = 'mock-field-container';
-    
-    if (typeof value === 'object' && value !== null) {
-      if (Array.isArray(value)) {
-        // 处理带有可折叠部分和添加/删除功能的数组
-        const arrayField = document.createElement('div');
-        arrayField.className = 'mock-field';
-        
-        // 创建可折叠头部
-        const collapsibleHeader = document.createElement('div');
-        collapsibleHeader.className = 'collapsible-header';
-        collapsibleHeader.textContent = `${key} (数组, ${value.length} 项)`;
-        arrayField.appendChild(collapsibleHeader);
-        
-        // Create array content container
-        const arrayContainer = document.createElement('div');
-        arrayContainer.className = 'mock-array';
-        
-        // Render array items
-        value.forEach((item, index) => {
-          const itemContainer = document.createElement('div');
-          itemContainer.className = 'mock-array-item';
-          
-          // Add remove button
-          const removeBtn = document.createElement('button');
-          removeBtn.className = 'remove-item-btn';
-          removeBtn.textContent = '删除';
-          removeBtn.addEventListener('click', () => {
-            value.splice(index, 1);
-            renderMockDataEditor(mockData, parentElement, path);
-          });
-          itemContainer.appendChild(removeBtn);
-          
-          // Render item content
-          renderMockDataEditor(item, itemContainer, `${currentPath}[${index}]`);
-          arrayContainer.appendChild(itemContainer);
-        });
-        
-        // Add array actions (add item)
-        const arrayActions = document.createElement('div');
-        arrayActions.className = 'array-actions';
-        
-        const addBtn = document.createElement('button');
-        addBtn.textContent = '增加项';
-        addBtn.addEventListener('click', () => {
-          let newItem;
-          
-          if (value.length > 0) {
-            // If array has existing items, use their structure
-            newItem = JSON.parse(JSON.stringify(value[0]));
-          } else {
-            // If array is empty, try to get structure from original response structure
-            try {
-              // Get the corresponding structure from the original response structure
-              const structurePath = path ? `${path}.${key}` : key;
-              const structureParts = structurePath.split('.');
-              let currentStructure = window.currentMock?.responseStructure;
-              
-              // Navigate to the array structure
-              for (const part of structureParts) {
-                if (currentStructure && typeof currentStructure === 'object') {
-                  const arrayMatch = part.match(/(\w+)\[(\d+)\]/);
-                  if (arrayMatch) {
-                    const arrayName = arrayMatch[1];
-                    if (Array.isArray(currentStructure[arrayName])) {
-                      currentStructure = currentStructure[arrayName][0];
-                    } else {
-                      currentStructure = null;
-                    }
-                  } else {
-                    currentStructure = currentStructure[part];
-                  }
-                } else {
-                  currentStructure = null;
-                  break;
-                }
-              }
-              
-              // Generate mock data from the structure
-              if (currentStructure && typeof currentStructure === 'object') {
-                newItem = generateMockData(currentStructure);
-              } else {
-                // Fallback to empty object if structure not found
-                newItem = {};
-              }
-            } catch (error) {
-              console.error('Error generating new array item:', error);
-              newItem = {};
-            }
-          }
-          
-          // Add the new item to the array
-          value.push(newItem);
-          renderMockDataEditor(mockData, parentElement, path);
-        });
-        arrayActions.appendChild(addBtn);
-        arrayContainer.appendChild(arrayActions);
-        
-        arrayField.appendChild(arrayContainer);
-        fieldContainer.appendChild(arrayField);
-        
-        // Add collapse functionality
-        collapsibleHeader.addEventListener('click', () => {
-          collapsibleHeader.classList.toggle('collapsed');
-          arrayContainer.classList.toggle('collapsed');
-        });
+  const jsonElement = document.createElement('div');
+  jsonElement.className = 'json-editor';
+  parentElement.appendChild(jsonElement);
+  
+  // 渲染JSON结构
+  renderJsonValue(mockData, jsonElement, mockData, path);
+}
+
+// 渲染JSON值
+function renderJsonValue(value, container, rootData, path = '') {
+  if (typeof value === 'object' && value !== null) {
+    if (Array.isArray(value)) {
+      renderJsonArray(value, container, rootData, path);
+    } else {
+      renderJsonObject(value, container, rootData, path);
+    }
+  } else {
+    renderJsonPrimitive(value, container, rootData, path);
+  }
+}
+
+// 渲染JSON对象
+function renderJsonObject(obj, container, rootData, path = '') {
+  const objectContainer = document.createElement('div');
+  objectContainer.className = 'json-object';
+  
+  // 只有非最外层响应体才显示折叠/展开按钮
+  if (path !== '') {
+    // 添加折叠/展开按钮 - 放在花括号左侧
+    const collapseBtn = document.createElement('button');
+    collapseBtn.className = 'collapse-btn';
+    collapseBtn.style.marginRight = '4px';
+    collapseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      collapseBtn.classList.toggle('collapsed');
+      const content = objectContainer.querySelector('.collapsible-content');
+      const placeholder = objectContainer.querySelector('.collapsed-placeholder');
+      if (collapseBtn.classList.contains('collapsed')) {
+        content.classList.add('collapsed-content');
+        placeholder.style.display = 'inline';
       } else {
-        // Handle objects with collapsible sections
-        const objectField = document.createElement('div');
-        objectField.className = 'mock-field';
-        
-        // Create collapsible header
-        const collapsibleHeader = document.createElement('div');
-        collapsibleHeader.className = 'collapsible-header';
-        collapsibleHeader.textContent = key;
-        objectField.appendChild(collapsibleHeader);
-        
-        // Create object content container
-        const objectContainer = document.createElement('div');
-        objectContainer.className = 'mock-object';
-        
-        // Render object properties
-        renderMockDataEditor(value, objectContainer, currentPath);
-        objectField.appendChild(objectContainer);
-        fieldContainer.appendChild(objectField);
-        
-        // Add collapse functionality
-        collapsibleHeader.addEventListener('click', () => {
-          collapsibleHeader.classList.toggle('collapsed');
-          objectContainer.classList.toggle('collapsed');
-        });
+        content.classList.remove('collapsed-content');
+        placeholder.style.display = 'none';
+      }
+    });
+    objectContainer.appendChild(collapseBtn);
+  }
+  
+  // 渲染左花括号
+  const leftBrace = document.createElement('span');
+  leftBrace.className = 'json-punctuation';
+  leftBrace.textContent = '{';
+  objectContainer.appendChild(leftBrace);
+  
+  // 创建可折叠内容容器
+  const collapsibleContent = document.createElement('div');
+  collapsibleContent.className = 'collapsible-content';
+  
+  // 渲染对象内容
+  const contentContainer = document.createElement('div');
+  contentContainer.className = 'json-container';
+  
+  const keys = Object.keys(obj);
+  keys.forEach((key, index) => {
+    const keyContainer = document.createElement('div');
+    keyContainer.className = 'json-property';
+    
+    // 渲染可编辑的键
+    const keySpan = document.createElement('span');
+    keySpan.className = 'json-key editable';
+    keySpan.textContent = `"${key}"`;
+    keySpan.dataset.path = path;
+    keySpan.dataset.originalKey = key;
+    keyContainer.appendChild(keySpan);
+    
+    // 单独渲染冒号，不包含在键的高亮范围内
+    const colon = document.createElement('span');
+    colon.className = 'json-punctuation';
+    colon.textContent = ': ';
+    keyContainer.appendChild(colon);
+    
+    // 添加键编辑功能
+    keySpan.addEventListener('click', () => {
+      enableKeyEditMode(keySpan, key, rootData, path);
+    });
+    
+    // 渲染值
+    const valuePath = path ? `${path}.${key}` : key;
+    renderJsonValue(obj[key], keyContainer, rootData, valuePath);
+    
+    // 渲染逗号 - 紧跟在值后面，最后一个元素不添加逗号
+    if (index < keys.length - 1) {
+      const comma = document.createElement('span');
+      comma.className = 'json-punctuation';
+      comma.textContent = ',';
+      keyContainer.appendChild(comma);
+    }
+    
+    contentContainer.appendChild(keyContainer);
+    
+    // 添加字段分隔线，用于生成新字段
+    const addFieldLine = document.createElement('div');
+    addFieldLine.className = 'add-field-line';
+    addFieldLine.dataset.path = path;
+    addFieldLine.dataset.index = index;
+    addFieldLine.addEventListener('click', () => {
+      addEmptyField(obj, contentContainer, rootData, path, index + 1);
+    });
+    contentContainer.appendChild(addFieldLine);
+  });
+  
+  // 在最后一个字段后添加添加字段线
+  if (keys.length > 0) {
+    const addFieldLine = document.createElement('div');
+    addFieldLine.className = 'add-field-line';
+    addFieldLine.dataset.path = path;
+    addFieldLine.dataset.index = keys.length;
+    addFieldLine.addEventListener('click', () => {
+      addEmptyField(obj, contentContainer, rootData, path, keys.length);
+    });
+    contentContainer.appendChild(addFieldLine);
+  }
+  
+  // 将内容容器添加到可折叠容器中
+  collapsibleContent.appendChild(contentContainer);
+  objectContainer.appendChild(collapsibleContent);
+  
+  // 只有非最外层响应体才显示折叠占位符
+  if (path !== '') {
+    // 添加折叠占位符
+    const placeholder = document.createElement('span');
+    placeholder.className = 'collapsed-placeholder';
+    placeholder.textContent = `...${keys.length}items`;
+    placeholder.style.display = 'none';
+    placeholder.style.marginLeft = '16px';
+    objectContainer.appendChild(placeholder);
+  }
+  
+  // 渲染右花括号 - 最外层响应体不添加末尾逗号
+  const rightBrace = document.createElement('span');
+  rightBrace.className = 'json-punctuation';
+  rightBrace.textContent = '}';
+  objectContainer.appendChild(rightBrace);
+  
+  container.appendChild(objectContainer);
+}
+
+// 渲染JSON数组
+function renderJsonArray(arr, container, rootData, path = '') {
+  const arrayContainer = document.createElement('div');
+  arrayContainer.className = 'json-array';
+  
+  // 只有非最外层响应体才显示折叠/展开按钮
+  if (path !== '') {
+    // 添加折叠/展开按钮 - 放在中括号左侧
+    const collapseBtn = document.createElement('button');
+    collapseBtn.className = 'collapse-btn';
+    collapseBtn.style.marginRight = '4px';
+    collapseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      collapseBtn.classList.toggle('collapsed');
+      const content = arrayContainer.querySelector('.collapsible-content');
+      const placeholder = arrayContainer.querySelector('.collapsed-placeholder');
+      if (collapseBtn.classList.contains('collapsed')) {
+        content.classList.add('collapsed-content');
+        placeholder.style.display = 'inline';
+      } else {
+        content.classList.remove('collapsed-content');
+        placeholder.style.display = 'none';
+      }
+    });
+    arrayContainer.appendChild(collapseBtn);
+  }
+  
+  // 渲染左中括号
+  const leftBracket = document.createElement('span');
+  leftBracket.className = 'json-punctuation';
+  leftBracket.textContent = '[';
+  arrayContainer.appendChild(leftBracket);
+  
+  // 创建可折叠内容容器
+  const collapsibleContent = document.createElement('div');
+  collapsibleContent.className = 'collapsible-content';
+  
+  // 渲染数组内容
+  const contentContainer = document.createElement('div');
+  contentContainer.className = 'json-container';
+  
+  arr.forEach((item, index) => {
+    const itemContainer = document.createElement('div');
+    itemContainer.className = 'json-array-item';
+    
+    // 渲染值
+    const itemPath = path ? `${path}[${index}]` : `[${index}]`;
+    renderJsonValue(item, itemContainer, rootData, itemPath);
+    
+    // 渲染逗号 - 紧跟在值后面，最后一个元素不添加逗号
+    if (index < arr.length - 1) {
+      const comma = document.createElement('span');
+      comma.className = 'json-punctuation';
+      comma.textContent = ',';
+      itemContainer.appendChild(comma);
+    }
+    
+    contentContainer.appendChild(itemContainer);
+  });
+  
+  // 将内容容器添加到可折叠容器中
+  collapsibleContent.appendChild(contentContainer);
+  arrayContainer.appendChild(collapsibleContent);
+  
+  // 只有非最外层响应体才显示折叠占位符
+  if (path !== '') {
+    // 添加折叠占位符
+    const placeholder = document.createElement('span');
+    placeholder.className = 'collapsed-placeholder';
+    placeholder.textContent = `...${arr.length}items`;
+    placeholder.style.display = 'none';
+    placeholder.style.marginLeft = '16px';
+    arrayContainer.appendChild(placeholder);
+  }
+  
+  // 渲染右中括号 - 最外层响应体不添加末尾逗号
+  const rightBracket = document.createElement('span');
+  rightBracket.className = 'json-punctuation';
+  rightBracket.textContent = ']';
+  arrayContainer.appendChild(rightBracket);
+  
+  container.appendChild(arrayContainer);
+}
+
+// 渲染JSON原始值
+function renderJsonPrimitive(value, container, rootData, path = '') {
+  const valueContainer = document.createElement('span');
+  valueContainer.className = 'json-value';
+  valueContainer.dataset.path = path;
+  
+  let valueText = '';
+  let valueClass = '';
+  
+  switch (typeof value) {
+    case 'string':
+      valueText = `"${value}"`;
+      valueClass = 'json-string';
+      break;
+    case 'number':
+      valueText = String(value);
+      valueClass = 'json-number';
+      break;
+    case 'boolean':
+      valueText = String(value);
+      valueClass = 'json-boolean';
+      break;
+    case 'null':
+      valueText = 'null';
+      valueClass = 'json-null';
+      break;
+    default:
+      valueText = String(value);
+      valueClass = 'json-string';
+  }
+  
+  valueContainer.innerHTML = `<span class="${valueClass}">${valueText}</span>`;
+  
+  // 添加点击编辑功能
+  valueContainer.addEventListener('click', () => {
+    if (!valueContainer.classList.contains('editing')) {
+      enableEditMode(valueContainer, value, rootData, path);
+    }
+  });
+  
+  container.appendChild(valueContainer);
+}
+
+// 启用编辑模式
+function enableEditMode(element, value, rootData, path) {
+  // 移除所有其他编辑模式
+  document.querySelectorAll('.json-value.editing').forEach(el => {
+    cancelEdit(el);
+  });
+  
+  element.classList.add('editing');
+  
+  const valueType = typeof value;
+  const currentValue = valueType === 'boolean' ? String(value) : valueType === 'string' ? value : String(value);
+  
+  // 创建输入框
+  const input = document.createElement('input');
+  input.className = 'json-edit-input';
+  input.type = 'text';
+  input.value = currentValue;
+  input.style.width = 'auto';
+  
+  // 替换内容
+  element.innerHTML = '';
+  element.appendChild(input);
+  
+  // 聚焦输入框
+  input.focus();
+  input.select();
+  
+  // 阻止输入框点击事件冒泡，防止触发父元素的点击事件
+  input.addEventListener('click', (e) => {
+    e.stopPropagation();
+  });
+  
+  // 处理输入事件
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      saveEdit(element, input, rootData, path, valueType);
+    } else if (e.key === 'Escape') {
+      cancelEdit(element, value);
+    }
+  });
+  
+  // 处理失焦事件
+  input.addEventListener('blur', () => {
+    saveEdit(element, input, rootData, path, valueType);
+  });
+  
+  // 根据字符串长度计算输入框宽度
+  const charWidth = 8; // 每个字符的估计宽度
+  const textLength = currentValue.length;
+  const calculatedWidth = textLength * charWidth;
+  
+  // 调整输入框宽度以适应内容，同时避免换行
+  const containerWidth = element.parentElement.offsetWidth;
+  const minWidth = 60; // 最小宽度
+  const maxInputWidth = Math.min(120, containerWidth - 20); // 减小最大宽度
+  const finalWidth = Math.min(maxInputWidth, Math.max(minWidth, calculatedWidth + 16)); // +16 用于内边距和边框
+  
+  input.style.width = `${finalWidth}px`;
+}
+
+// 保存编辑
+function saveEdit(element, input, rootData, path, originalType) {
+  let newValue = input.value.trim();
+  
+  // 转换值类型
+  if (originalType === 'number') {
+    newValue = isNaN(newValue) ? 0 : Number(newValue);
+  } else if (originalType === 'boolean') {
+    newValue = newValue.toLowerCase() === 'true';
+  } else if (originalType === 'string') {
+    // 移除引号（如果有）
+    if ((newValue.startsWith('"') && newValue.endsWith('"')) || 
+        (newValue.startsWith("'") && newValue.endsWith("'"))) {
+      newValue = newValue.substring(1, newValue.length - 1);
+    }
+  }
+  
+  // 更新数据
+  updateValueByPath(rootData, path, newValue);
+  
+  // 重新渲染编辑器
+  renderMockDataEditor(window.currentMock.mockData, mockDataContainer);
+}
+
+// 取消编辑
+function cancelEdit(element, originalValue) {
+  element.classList.remove('editing');
+  element.innerHTML = '';
+  
+  let valueText = '';
+  let valueClass = '';
+  
+  switch (typeof originalValue) {
+    case 'string':
+      valueText = `"${originalValue}"`;
+      valueClass = 'json-string';
+      break;
+    case 'number':
+      valueText = String(originalValue);
+      valueClass = 'json-number';
+      break;
+    case 'boolean':
+      valueText = String(originalValue);
+      valueClass = 'json-boolean';
+      break;
+    case 'null':
+      valueText = 'null';
+      valueClass = 'json-null';
+      break;
+    default:
+      valueText = String(originalValue);
+      valueClass = 'json-string';
+  }
+  
+  element.innerHTML = `<span class="${valueClass}">${valueText}</span>`;
+}
+
+// 通过路径更新值
+function updateValueByPath(obj, path, value) {
+  const pathParts = path.split('.');
+  let current = obj;
+  
+  for (let i = 0; i < pathParts.length - 1; i++) {
+    const part = pathParts[i];
+    const arrayMatch = part.match(/(\w+)\[(\d+)\]/);
+    
+    if (arrayMatch) {
+      const arrayName = arrayMatch[1];
+      const index = parseInt(arrayMatch[2]);
+      current = current[arrayName][index];
+    } else {
+      current = current[part];
+    }
+  }
+  
+  const lastPart = pathParts[pathParts.length - 1];
+  const arrayMatch = lastPart.match(/(\w+)\[(\d+)\]/);
+  
+  if (arrayMatch) {
+    const arrayName = arrayMatch[1];
+    const index = parseInt(arrayMatch[2]);
+    current[arrayName][index] = value;
+  } else {
+    current[lastPart] = value;
+  }
+}
+
+// 启用键编辑模式
+function enableKeyEditMode(element, key, rootData, path) {
+  // 移除所有其他编辑模式
+  document.querySelectorAll('.json-key.editing').forEach(el => {
+    cancelKeyEdit(el);
+  });
+  
+  element.classList.add('editing');
+  
+  // 创建输入框
+  const input = document.createElement('input');
+  input.className = 'json-key-input';
+  input.type = 'text';
+  input.value = key;
+  
+  // 设置输入框样式
+  input.style.width = 'auto';
+  input.style.minWidth = '60px';
+  input.style.padding = '2px 4px';
+  input.style.border = '1px solid #667eea';
+  input.style.borderRadius = '3px';
+  input.style.fontFamily = 'inherit';
+  input.style.fontSize = 'inherit';
+  input.style.color = '#986801';
+  input.style.fontWeight = '600';
+  input.style.background = 'white';
+  input.style.outline = 'none';
+  input.style.boxShadow = '0 0 0 2px rgba(102, 126, 234, 0.2)';
+  input.style.boxSizing = 'border-box';
+  
+  // 替换内容
+  element.innerHTML = '';
+  element.appendChild(input);
+  
+  // 根据字符串长度计算输入框宽度
+  const charWidth = 8; // 每个字符的估计宽度
+  const textLength = key.length;
+  const calculatedWidth = textLength * charWidth;
+  
+  // 动态调整输入框宽度
+  const containerWidth = element.parentElement.offsetWidth;
+  const minWidth = 60; // 最小宽度
+  const maxInputWidth = Math.min(120, containerWidth - 20); // 减小最大宽度
+  const finalWidth = Math.min(maxInputWidth, Math.max(minWidth, calculatedWidth + 16)); // +16 用于内边距和边框
+  
+  input.style.width = `${finalWidth}px`;
+  
+  // 聚焦输入框
+  input.focus();
+  input.select();
+  
+  // 阻止输入框点击事件冒泡，防止触发父元素的点击事件
+  input.addEventListener('click', (e) => {
+    e.stopPropagation();
+  });
+  
+  // 处理输入事件
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      saveKeyEdit(element, input, key, rootData, path);
+    } else if (e.key === 'Escape') {
+      cancelKeyEdit(element);
+    }
+  });
+  
+  // 处理失焦事件
+  input.addEventListener('blur', () => {
+    saveKeyEdit(element, input, key, rootData, path);
+  });
+}
+
+// 保存键编辑
+function saveKeyEdit(element, input, originalKey, rootData, path) {
+  const newValue = input.value.trim();
+  element.classList.remove('editing');
+  
+  if (newValue === '' || newValue === originalKey) {
+    // 如果值为空或未改变，恢复原始键，只保留字段名，不包含冒号
+    element.innerHTML = `<span class="json-key">"${originalKey}"</span>`;
+  } else {
+    // 更新对象中的键
+    const obj = path ? getObjectByPath(rootData, path) : rootData;
+    if (obj) {
+      // 创建新对象，保留原有顺序
+      const newObj = {};
+      for (const key in obj) {
+        if (key === originalKey) {
+          newObj[newValue] = obj[key];
+        } else {
+          newObj[key] = obj[key];
+        }
+      }
+      
+      // 替换旧对象
+      if (path) {
+        // 对于嵌套对象，需要更新父对象
+        const parentPath = path.split('.').slice(0, -1).join('.');
+        const parentObj = getObjectByPath(rootData, parentPath);
+        const lastPart = path.split('.').pop();
+        parentObj[lastPart] = newObj;
+      } else {
+        // 对于根对象，直接替换
+        Object.assign(rootData, newObj);
+      }
+      
+      // 重新渲染编辑器
+      renderMockDataEditor(rootData, mockDataContainer);
+    }
+  }
+}
+
+// 取消键编辑
+function cancelKeyEdit(element) {
+  const originalKey = element.dataset.originalKey;
+  element.classList.remove('editing');
+  // 恢复原始键，只保留字段名，不包含冒号
+  element.innerHTML = `<span class="json-key">"${originalKey}"</span>`;
+}
+
+// 获取路径对应的对象
+function getObjectByPath(obj, path) {
+  if (!path) return obj;
+  
+  const pathParts = path.split('.');
+  let current = obj;
+  
+  for (const part of pathParts) {
+    const arrayMatch = part.match(/(\w+)\[(\d+)\]/);
+    if (arrayMatch) {
+      const arrayName = arrayMatch[1];
+      const index = parseInt(arrayMatch[2]);
+      current = current[arrayName][index];
+    } else {
+      current = current[part];
+    }
+    
+    if (current === undefined) break;
+  }
+  
+  return current;
+}
+
+// 添加空字段
+function addEmptyField(obj, container, rootData, path, index) {
+  // 创建空字段容器
+  const emptyFieldContainer = document.createElement('div');
+  emptyFieldContainer.className = 'json-property json-empty-field';
+  
+  // 创建键输入框
+  const keyInput = document.createElement('input');
+  keyInput.className = 'json-key-input empty';
+  keyInput.type = 'text';
+  keyInput.placeholder = '字段名';
+  
+  // 创建冒号
+  const colon = document.createElement('span');
+  colon.className = 'json-punctuation';
+  colon.textContent = ': ';
+  
+  // 创建值输入框
+  const valueInput = document.createElement('input');
+  valueInput.className = 'json-edit-input empty';
+  valueInput.type = 'text';
+  valueInput.placeholder = '字段值';
+  
+  // 创建逗号
+  const comma = document.createElement('span');
+  comma.className = 'json-punctuation';
+  comma.textContent = ',';
+  
+  // 组装空字段
+  emptyFieldContainer.appendChild(keyInput);
+  emptyFieldContainer.appendChild(colon);
+  emptyFieldContainer.appendChild(valueInput);
+  emptyFieldContainer.appendChild(comma);
+  
+  // 插入到指定位置
+  const children = container.children;
+  let insertIndex = index * 2; // 每个字段后有一个分隔线
+  if (insertIndex >= children.length) {
+    container.appendChild(emptyFieldContainer);
+  } else {
+    container.insertBefore(emptyFieldContainer, children[insertIndex]);
+  }
+  
+  // 聚焦到键输入框
+  keyInput.focus();
+  
+  // 处理失焦事件
+  let isSaving = false;
+  
+  function handleBlur() {
+    if (isSaving) return;
+    isSaving = true;
+    
+    const key = keyInput.value.trim();
+    const value = valueInput.value.trim();
+    
+    // 检查是否有输入框为空
+    const isKeyEmpty = key === '';
+    const isValueEmpty = value === '';
+    
+    if (isKeyEmpty && isValueEmpty) {
+      // 两个输入框都为空，删除空字段
+      emptyFieldContainer.remove();
+    } else if (isKeyEmpty || isValueEmpty) {
+      // 有一个输入框为空，输入框爆红
+      if (isKeyEmpty) {
+        keyInput.style.borderColor = '#f56565';
+        keyInput.style.boxShadow = '0 0 0 2px rgba(245, 101, 101, 0.2)';
+      } else {
+        keyInput.style.borderColor = '#667eea';
+        keyInput.style.boxShadow = '0 0 0 2px rgba(102, 126, 234, 0.2)';
+      }
+      
+      if (isValueEmpty) {
+        valueInput.style.borderColor = '#f56565';
+        valueInput.style.boxShadow = '0 0 0 2px rgba(245, 101, 101, 0.2)';
+      } else {
+        valueInput.style.borderColor = '#667eea';
+        valueInput.style.boxShadow = '0 0 0 2px rgba(102, 126, 234, 0.2)';
       }
     } else {
-        // Handle primitive values
-        const primitiveField = document.createElement('div');
-        primitiveField.className = 'mock-field';
-        
-        const fieldLabel = document.createElement('label');
-        fieldLabel.textContent = key;
-        primitiveField.appendChild(fieldLabel);
-        
-        const fieldInput = document.createElement('input');
-        fieldInput.type = typeof value === 'boolean' ? 'checkbox' : 'text';
-        fieldInput.value = typeof value === 'boolean' ? value : String(value);
-        fieldInput.checked = typeof value === 'boolean' ? value : false;
-        fieldInput.dataset.path = currentPath;
-        
-        // Set default values for ErrorModule and ErrorCode
-        if (key === 'ErrorModule' || key === 'ErrorCode') {
-          fieldInput.value = '0';
-        }
-        
-        // Add data-value attribute for boolean fields to show current value
-        if (typeof value === 'boolean') {
-          primitiveField.dataset.value = value ? 'true' : 'false';
-          
-          // Update data-value when checkbox is toggled
-          fieldInput.addEventListener('change', () => {
-            primitiveField.dataset.value = fieldInput.checked ? 'true' : 'false';
-          });
-        }
-        
-        primitiveField.appendChild(fieldInput);
-        fieldContainer.appendChild(primitiveField);
-      }
+      // 两个输入框都有值，生成新字段
+      const parsedValue = parseJsonValue(value);
+      
+      // 获取父对象
+      const parentObj = path ? getObjectByPath(rootData, path) : rootData;
+      
+      // 添加新字段
+      parentObj[key] = parsedValue;
+      
+      // 重新渲染编辑器
+      renderMockDataEditor(rootData, mockDataContainer);
+    }
     
-    parentElement.appendChild(fieldContainer);
+    isSaving = false;
   }
+  
+  // 延迟处理失焦，确保点击事件能先触发
+  keyInput.addEventListener('blur', handleBlur);
+  valueInput.addEventListener('blur', handleBlur);
+  
+  // 处理回车键
+  keyInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      if (keyInput.value.trim() === '') {
+        keyInput.style.borderColor = '#f56565';
+        keyInput.style.boxShadow = '0 0 0 2px rgba(245, 101, 101, 0.2)';
+        return;
+      }
+      valueInput.focus();
+    }
+  });
+  
+  valueInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      handleBlur();
+    }
+  });
+}
+
+// 解析JSON值
+function parseJsonValue(value) {
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  if (value === 'null') return null;
+  if (/^\d+\.?\d*$/.test(value)) return parseFloat(value);
+  if (value.startsWith('{') && value.endsWith('}')) {
+    try { return JSON.parse(value); }
+    catch (e) { return value; }
+  }
+  if (value.startsWith('[') && value.endsWith(']')) {
+    try { return JSON.parse(value); }
+    catch (e) { return value; }
+  }
+  return value;
 }
 
 // 从编辑器更新模拟数据
 function updateMockDataFromEditor(mockData, container) {
-  const inputs = container.querySelectorAll('input[data-path]');
-  
-  inputs.forEach(input => {
-    const path = input.dataset.path;
-    const value = input.type === 'checkbox' ? input.checked : 
-                 input.value === '' ? '' :
-                 isNaN(input.value) ? input.value : Number(input.value);
-    
-    // 使用路径更新模拟数据
-    const pathParts = path.split('.');
-    let current = mockData;
-    
-    for (let i = 0; i < pathParts.length - 1; i++) {
-      const part = pathParts[i];
-      const arrayMatch = part.match(/(\w+)\[(\d+)\]/);
-      if (arrayMatch) {
-        const arrayName = arrayMatch[1];
-        const index = parseInt(arrayMatch[2]);
-        current = current[arrayName][index];
-      } else {
-        current = current[part];
-      }
-    }
-    
-    const lastPart = pathParts[pathParts.length - 1];
-    const arrayMatch = lastPart.match(/(\w+)\[(\d+)\]/);
-    if (arrayMatch) {
-      const arrayName = arrayMatch[1];
-      const index = parseInt(arrayMatch[2]);
-      const fieldName = arrayMatch[1];
-      current[arrayName][index] = value;
-    } else {
-      current[lastPart] = value;
-    }
-  });
-  
+  // 在VSCode风格编辑器中，数据直接通过点击编辑更新到window.currentMock.mockData中
+  // 这里直接返回当前的mockData
   return mockData;
 }
 

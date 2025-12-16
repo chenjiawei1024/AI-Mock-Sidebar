@@ -8,10 +8,10 @@ class AIMock {
     this.abortController = null;
   }
 
-  // Check if browser supports Gemini Nano
+  // 判断浏览器是否支持Gemini Nano
   async checkSupport() {
     try {
-      // Check if LanguageModel API is available
+      // 判断浏览器是否支持LanguageModel API
       if (!window.LanguageModel) {
         this.isSupported = false;
         this.modelStatus = 'unavailable';
@@ -21,12 +21,12 @@ class AIMock {
         };
       }
 
-      // Check model availability status
+      // 判断模型可用性状态
       const availability = await window.LanguageModel.availability();
       this.modelStatus = availability;
       
       if (availability === 'available') {
-        // Create session if model is available
+        // 创建会话如果模型可用
         await this.createSession();
         this.isSupported = true;
         return {
@@ -34,7 +34,7 @@ class AIMock {
           message: '已检测到可用的Gemini Nano模型！'
         };
       } else if (availability === 'downloading') {
-        // Model is downloading, wait for it to complete
+        // 模型正在下载, 等待下载完成
         this.isSupported = false;
         return {
           supported: false,
@@ -70,10 +70,10 @@ class AIMock {
     }
   }
 
-  // Create model session
+  // 创建模型会话
   async createSession() {
     try {
-      // Create model session
+      // 创建模型会话
       this.aiSession = await window.LanguageModel.create({
         initialPrompts: [
           {
@@ -92,7 +92,7 @@ class AIMock {
     }
   }
 
-  // Generate prompt for AI mock data generation
+  // 生成用于AI Mock数据生成的提示
   generatePrompt(responseText) {
     return `请根据以下包含注释的JSON响应报文格式，生成一个合理的、真实可用的mock数据：
 
@@ -121,7 +121,7 @@ ${responseText}
 14. 生成的数据要符合实际业务场景，避免生成无意义的随机值`;
   }
 
-  // Generate mock data using AI
+  // 使用AI生成Mock数据
   async generateMockData(responseText) {
     if (!this.isSupported) {
       throw new Error('Gemini Nano is not supported');
@@ -132,18 +132,18 @@ ${responseText}
     }
 
     try {
-      // Create model session if not already created
+      // 创建会话如果还未创建
       if (!this.aiSession) {
         await this.createSession();
       }
 
-      // Generate prompt
+      // 生成提示
       const prompt = this.generatePrompt(responseText);
       
-      // Generate mock data using AI
+      // 使用AI生成mock数据
       const aiResponse = await this.aiSession.prompt(prompt);
       
-      // Extract text from response
+      // 提取响应文本
       let generatedText = aiResponse;
       // let generatedText = '';
       // for (const part of aiResponse.parts) {
@@ -152,16 +152,16 @@ ${responseText}
       //   }
       // }
       
-      // Clean up the response (remove any markdown, extra text, and comments)
+      // 清理响应文本（移除任何Markdown、额外文本和注释）
       let cleanText = generatedText.replace(/```json|```/g, '').trim();
       
       // Further clean up: remove any remaining /* */ comments
       cleanText = cleanText.replace(/\/\*.*?\*\//gs, '').trim();
       
-      // Parse generated JSON
+      // 解析生成的JSON
       const generatedMock = JSON.parse(cleanText);
       
-      // Ensure ErrorModule and ErrorCode are 0
+      // 确保ErrorModule和ErrorCode为0
       if (generatedMock.ResponseStatus) {
         generatedMock.ResponseStatus.ErrorModule = 0;
         generatedMock.ResponseStatus.ErrorCode = 0;

@@ -122,6 +122,13 @@ label {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+/* 优化提示框外观 */
+.tip-icon {
+  /* Modern tooltip styling is handled by the browser's native title attribute */
+  /* We can enhance it with CSS, but native tooltips are more accessible */
+  /* The title attribute already provides multi-line support */
+}
+
 input[type="text"], textarea, select {
   width: 100%;
   padding: 8px 10px;
@@ -186,22 +193,178 @@ button:disabled {
   transform: none;
 }
 
-/* VSCode风格的JSON编辑器样式 */
+/* 模拟数据编辑器样式 */
+.mock-field {
+  margin-bottom: 4px;
+  padding: 6px;
+  background: #f7fafc;
+  border-radius: 3px;
+  border: 1px solid #e2e8f0;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mock-field:hover {
+  background: #edf2f7;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.mock-field label {
+  font-weight: 600;
+  margin-bottom: 0;
+  font-size: 11px;
+  color: #2d3748;
+  text-transform: none;
+  letter-spacing: 0;
+  min-width: 80px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mock-field input {
+  flex: 1;
+  min-width: 120px;
+  padding: 5px 7px;
+  border: 1px solid #cbd5e0;
+  border-radius: 3px;
+  font-size: 11px;
+  transition: all 0.2s ease;
+}
+
+/* 优化嵌套字段间距 */
+.mock-object .mock-field,
+.mock-array .mock-field {
+  margin-bottom: 3px;
+  padding: 5px;
+  font-size: 11px;
+}
+
+.mock-object .mock-field label,
+.mock-array .mock-field label {
+  min-width: 70px;
+  font-size: 10px;
+}
+
+.mock-object .mock-field input,
+.mock-array .mock-field input {
+  font-size: 10px;
+  min-width: 100px;
+}
+
+/* 布尔字段的复选框样式 */
+.mock-field input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  padding: 0;
+  height: 16px;
+  width: 16px;
+  cursor: pointer;
+  accent-color: #667eea;
+  border: 1px solid #cbd5e0;
+  border-radius: 3px;
+  transition: all 0.2s ease;
+}
+
+.mock-field input[type="checkbox"]:checked {
+  background-color: #667eea;
+  border-color: #667eea;
+  color: white;
+}
+
+.mock-field input[type="checkbox"]:hover {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+/* 添加布尔值指示器 */
+.mock-field:has(input[type="checkbox"])::after {
+  content: attr(data-value);
+  font-size: 11px;
+  color: #718096;
+  font-weight: 600;
+  margin-left: 8px;
+  min-width: 40px;
+  text-align: right;
+}
+
+/* 对齐复选框和标签 */
+.mock-field:has(input[type="checkbox"]) {
+  justify-content: flex-start;
+}
+
+.mock-field input:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+/* 可折叠部分 */
+.collapsible-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  margin-bottom: 4px;
+  font-weight: 600;
+  color: #4a5568;
+  user-select: none;
+  font-size: 12px;
+  padding: 4px 0;
+  background: rgba(102, 126, 234, 0.1);
+  border-radius: 3px;
+  padding-left: 8px;
+}
+
+.collapsible-header:hover {
+  background: rgba(102, 126, 234, 0.15);
+}
+
+.collapsible-header::before {
+  content: '▼';
+  font-size: 8px;
+  transition: transform 0.2s ease;
+}
+
+.collapsible-header.collapsed::before {
+  transform: rotate(-90deg);
+}
+
+/* 模拟字段容器 */
+.mock-field-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* 使模拟数据容器更紧凑且可滚动 */
 #mockDataContainer {
   overflow-x: auto;
   max-height: 400px;
   overflow-y: auto;
-  padding: 10px;
-  background: #f8f9fa;
-  border-radius: 4px;
-  border: 1px solid #e2e8f0;
-  font-family: 'Fira Code', 'Consolas', monospace;
-  font-size: 12px;
-  white-space: nowrap; /* 防止内容换行 */
-  word-break: normal; /* 正常的单词换行 */
+  padding-right: 8px;
+  padding-left: 2px;
+  margin-right: -4px;
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
 }
 
-/* 修复滚动条样式 */
+/* 确保正确滚动行为 */
+.mock-data-section {
+  position: relative;
+}
+
+/* 修复容器宽度计算 */
+.mock-field-container {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 优化滚动条样式 */
 #mockDataContainer::-webkit-scrollbar {
   width: 6px;
 }
@@ -220,326 +383,102 @@ button:disabled {
   background: #a0aec0;
 }
 
-/* JSON语法高亮 */
-.json-key {
-  color: #986801;
-  font-weight: 600;
-}
-
-.json-string {
-  color: #225cc0;
-}
-
-.json-number {
-  color: #005cc5;
-}
-
-.json-boolean {
-  color: #d73a49;
-}
-
-.json-null {
-  color: #6f42c1;
-}
-
-.json-punctuation {
-  color: #24292e;
-  font-weight: 600;
-}
-
-/* 可折叠容器 */
-.json-container {
+/* 嵌套对象和数组样式 */
+.mock-object, .mock-array {
   margin-left: 16px;
-  position: relative;
-}
-
-/* 折叠/展开按钮 */
-.collapse-btn {
-  /* 移除绝对定位，使用默认的行内块级定位 */
-  width: 12px;
-  height: 12px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-size: 10px;
-  color: #656d76;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 2px;
-  transition: all 0.1s ease;
-  box-shadow: none;
-  z-index: 10;
-  font-family: monospace;
-  line-height: 1;
-  vertical-align: middle;
-  margin-right: 4px;
-  margin-bottom: 1px;
-}
-
-.collapse-btn:hover {
-  background: rgba(101, 109, 118, 0.1);
-  transform: none;
-  box-shadow: none;
-}
-
-.collapse-btn::before {
-  content: '▼';
-  font-size: 6px;
-  transition: transform 0.1s ease;
-}
-
-.collapse-btn.collapsed::before {
-  transform: rotate(-90deg);
-}
-
-/* 折叠内容 */
-.collapsed-content {
-  display: none;
-}
-
-/* 折叠状态下的占位符 */
-.collapsed-placeholder {
-  color: #656d76;
-  font-style: italic;
-  margin-left: 16px;
-}
-
-/* 折叠/展开按钮 */
-.collapse-btn {
-  position: absolute;
-  left: -14px;
-  top: 2px;
-  width: 12px;
-  height: 12px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-size: 10px;
-  color: #656d76;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 2px;
-  transition: all 0.1s ease;
-  box-shadow: none;
-}
-
-.collapse-btn:hover {
-  background: rgba(101, 109, 118, 0.1);
-  transform: none;
-  box-shadow: none;
-}
-
-.collapse-btn::before {
-  content: '▼';
-  font-size: 8px;
-  transition: transform 0.1s ease;
-}
-
-.collapse-btn.collapsed::before {
-  transform: rotate(-90deg);
-}
-
-/* 折叠内容 */
-.collapsed-content {
-  display: none;
-}
-
-/* 折叠状态下的占位符 */
-.collapsed-placeholder {
-  color: #656d76;
-  font-style: italic;
-}
-
-/* 编辑区域样式 */
-.json-value {
-  position: relative;
-  border-radius: 3px;
-  cursor: text;
-  transition: all 0.1s ease;
-  display: inline-block;
-  min-width: 20px;
-}
-
-.json-value:hover {
-  background: rgba(102, 126, 234, 0.1);
-  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
-}
-
-.json-value.editing {
-  background: white;
-  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.3);
-}
-
-/* 编辑输入框 */
-.json-edit-input {
-  min-width: 80px !important;
-  max-width: 150px; /* 与字段名输入框一致 */
-  padding: 2px 4px !important;
-  border: 1px solid #667eea;
-  border-radius: 3px;
-  font-family: inherit;
-  font-size: 12px;
-  background: white;
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
-  box-sizing: border-box;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: inline-block;
-  vertical-align: middle;
-  line-height: 1.2;
-}
-
-.json-edit-input:focus {
-  border-color: #667eea;
-  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.4);
-}
-
-/* 数组和对象样式 */
-.json-object, .json-array {
-  position: relative;
-}
-
-/* 添加字段的横线样式 */
-.add-field-line {
-  height: 1px;
-  background: transparent;
-  margin: 4px 0;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-}
-
-.add-field-line:hover {
-  background: linear-gradient(90deg, transparent, #667eea, transparent);
-  box-shadow: 0 0 0 1px rgba(102, 126, 234, 0.3);
-}
-
-/* 添加字段的提示文字 */
-.add-field-line::after {
-  content: '+ 添加字段';
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  top: -16px;
-  background: #667eea;
-  color: white;
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-size: 10px;
-  opacity: 0;
-  visibility: hidden;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-  z-index: 100;
-}
-
-.add-field-line:hover::after {
-  opacity: 1;
-  visibility: visible;
-}
-
-/* JSON键输入框样式 */
-.json-key-input {
-  width: auto;
-  min-width: 60px;
-  max-width: 150px;
-  padding: 2px 4px;
-  border: 1px solid #667eea;
-  border-radius: 3px;
-  font-family: 'Fira Code', 'Consolas', monospace;
-  font-size: 12px;
-  color: #986801;
-  font-weight: 600;
-  background: white;
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
-  box-sizing: border-box;
-  display: inline-block;
-}
-
-.json-key-input:focus {
-  border-color: #667eea;
-  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.4);
-}
-
-.json-key-input.empty:focus {
-  border-color: #667eea;
-  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
-}
-
-/* 空字段容器样式 */
-.json-empty-field {
-  padding: 0;
-  margin: 0;
+  margin-top: 4px;
+  padding: 6px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
   background: rgba(102, 126, 234, 0.05);
-  border-radius: 3px;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  height: auto;
-  min-height: 18px;
-  transform: translateY(-6px);
-}
-
-/* 空字段输入框样式 */
-.json-empty-field .json-key-input.empty,
-.json-empty-field .json-edit-input.empty {
-  width: auto;
-  min-width: 60px;
-  max-width: 120px;
-  padding: 2px 4px;
-  border: 1px solid #667eea;
-  border-radius: 3px;
-  font-family: inherit;
-  font-size: 12px;
-  background: white;
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
-  box-sizing: border-box;
-  white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
-  display: inline-block;
-  vertical-align: middle;
-  line-height: 1.2;
-  height: auto;
-  min-height: 18px;
+  transition: all 0.2s ease;
+  /* max-height: 1000px; */
+  width: auto;
+  min-width: 0;
 }
 
-/* 空字段键输入框样式 */
-.json-empty-field .json-key-input.empty {
-  color: #986801;
-  font-weight: 600;
-  margin-right: 4px;
+.mock-object.collapsed, .mock-array.collapsed {
+  display: none;
+  max-height: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  width: auto;
 }
 
-/* 空字段冒号样式 */
-.json-empty-field .json-punctuation {
-  vertical-align: middle;
+.mock-object {
+  border-left: 2px solid #667eea;
 }
 
-.json-array-item {
+.mock-array {
+  border-left-color: #48bb78;
+  background: rgba(72, 187, 120, 0.05);
+}
+
+.mock-array-item {
+  margin-bottom: 8px;
+  padding: 10px;
+  background: white;
+  border-radius: 4px;
+  border: 1px solid #48bb78;
   position: relative;
-  padding: 4px 0;
+  transition: all 0.2s ease;
 }
 
-/* 可编辑键的悬停样式 */
-.json-key.editable {
-  cursor: text;
-  padding: 0 2px;
-  border-radius: 2px;
-  transition: all 0.1s ease;
+.mock-array-item:last-child {
+  margin-bottom: 0;
 }
 
-.json-key.editable:hover {
-  background: rgba(102, 126, 234, 0.1);
-  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+.mock-array-item:hover {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+/* 数组操作 */
+.array-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 4px;
+  background: rgba(72, 187, 120, 0.1);
+  border-radius: 3px;
+}
+
+.array-actions button {
+  padding: 4px 8px;
+  font-size: 11px;
+  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+}
+
+.array-actions button:hover {
+  background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
+}
+
+.remove-item-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  padding: 2px 6px;
+  font-size: 10px;
+  background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+  border-radius: 3px;
+  z-index: 10;
+}
+
+.mock-array-item::before {
+  content: 'Item';
+  position: absolute;
+  top: -6px;
+  left: 8px;
+  background: #48bb78;
+  color: white;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 /* 已保存模拟列表样式 */
@@ -568,11 +507,13 @@ button:disabled {
 
 .status-indicator.enabled {
   background: #48bb78;
+  /* Green dot for enabled */
   box-shadow: 0 0 0 2px rgba(72, 187, 120, 0.2);
 }
 
 .status-indicator.disabled {
   background: #f56565;
+  /* Red dot for disabled */
   box-shadow: 0 0 0 2px rgba(245, 101, 101, 0.2);
 }
 
@@ -860,7 +801,37 @@ button:disabled {
     padding: 8px;
   }
   
-  .mock-url {
-    font-size: 11px;
+  /* .mock-header {
+    flex-direction: column;
+    align-items: stretch;
+  } */
+  
+  /* .mock-actions {
+    margin-top: 8px;
+    flex-direction: row;
+  } */
+  
+  .toggle-btn, .delete-btn {
+    flex: 1;
+  }
+  
+  .mock-field {
+    padding: 8px;
+  }
+  
+  .mock-field label {
+    display: block;
+    min-width: auto;
+    margin-bottom: 6px;
+  }
+  
+  .mock-field input {
+    width: 100%;
+    margin-left: 0;
+  }
+  
+  .mock-object, .mock-array {
+    margin-left: 8px;
+    padding-left: 12px;
   }
 }
