@@ -78,7 +78,7 @@ class AIMock {
         initialPrompts: [
           {
             role: 'system',
-            content: '你是一个专业的API mock数据生成助手，能够根据JSON结构生成合理的mock数据。请用中文进行回复，确保生成的JSON数据符合要求。'
+            content: '你是一个专业的API mock数据生成助手，能够根据JSON结构生成合理的mock数据。请用中文进行回复，确保生成的JSON数据符合要求，同时生成的mock数据尽可能符合语义。'
           }
         ],
         expectedInputs: [{ type: 'text' }]
@@ -92,14 +92,49 @@ class AIMock {
     }
   }
 
+  // 处理注释，只保留xs和note信息
+  processComments(responseText) {
+    // 正则表达式：匹配/* */注释内容
+    const commentRegex = /\/\*([^*]|\*(?!\/))*\*\//g;
+    
+    // 替换所有注释，只保留xs和note信息
+    return responseText.replace(commentRegex, (match) => {
+      // 提取注释内容
+      let commentContent = match.slice(2, -2).trim();
+      
+      // 解析注释内容，提取xs和note
+      const xsMatch = commentContent.match(/xs:([^,\/]*)[\/,]/);
+      const noteMatch = commentContent.match(/note:([^,\/]*)[\/,]/);
+      
+      // 构建新的注释内容
+      let newComment = '/*';
+      
+      if (xsMatch) {
+        newComment += ` xs:${xsMatch[1].trim()}`;
+      }
+      
+      if (noteMatch) {
+        newComment += `, note:${noteMatch[1].trim()}`;
+      }
+      
+      newComment += ' */';
+      
+      // 如果没有xs和note信息，返回空字符串
+      return newComment === '/* */' ? '' : newComment;
+    });
+  }
+
   // 生成用于AI Mock数据生成的提示
   generatePrompt(responseText) {
+    // 处理注释，只保留xs和note信息
+    const processedResponseText = this.processComments(responseText);
+    
     return `请根据以下包含注释的JSON响应报文格式，生成一个合理的、真实可用的mock数据：
 
-${responseText}
+${processedResponseText}
 
 注释格式说明：
-每个@开头的字段包含一个注释，格式为：/* req, xs:类型, note:描述 */
+每个@开头的字段包含一个注释，格式为：/* xs:类型, note:描述 */
 其中：
 - xs: 表示字段的数据类型（如integer、string、object、array等）
 - note: 表示字段的业务描述和含义
@@ -121,6 +156,76 @@ ${responseText}
 14. 生成的数据要符合实际业务场景，避免生成无意义的随机值`;
   }
 
+  // 根据responseText生成JSON架构
+  generateJsonSchema(responseText) {
+    // 清理responseText，移除注释和@字段
+    let cleanText = responseText;
+    
+    // 1. 移除/* */注释
+    cleanText = cleanText.replace(/\/\*.*?\*\//gs, '').trim();
+    
+    // 2. 移除所有@开头的字段，无论其值是什么
+    cleanText = cleanText.replace(/\s*"@[^"]+"\s*:\s*"[^"]*"\s*,?\s*/g, '');
+    
+    // 3. 再次移除可能遗留的@字段（处理值为数字、对象等情况）
+    cleanText = cleanText.replace(/\s*"@[^"]+"\s*:\s*[^,\}\]]+\s*,?\s*/g, '');
+    
+    // 3. 移除末尾可能的多余逗号
+    cleanText = cleanText.replace(/,\s*}/g, '}');
+    cleanText = cleanText.replace(/,\s*\]/g, ']');
+    
+    // 简单的JSON Schema生成，基于responseText的结构
+    // 这里实现一个简单的递归生成器
+    function generateSchema(value) {
+      if (Array.isArray(value)) {
+        const itemSchema = value.length > 0 ? generateSchema(value[0]) : { "type": "string" };
+        return {
+          "type": "array",
+          "items": itemSchema
+        };
+      } else if (value !== null && typeof value === "object") {
+        const properties = {};
+        for (const [key, val] of Object.entries(value)) {
+          // 跳过空字符串键
+          if (key !== '') {
+            properties[key] = generateSchema(val);
+          }
+        }
+        return {
+          "type": "object",
+          "properties": properties,
+          "required": Object.keys(properties),
+          "additionalProperties": false
+        };
+      } else if (typeof value === "string") {
+        return { "type": "string" };
+      } else if (typeof value === "number") {
+        return { "type": "number" };
+      } else if (typeof value === "boolean") {
+        return { "type": "boolean" };
+      } else if (value === null) {
+        return { "type": "null" };
+      } else {
+        return { "type": "string" };
+      }
+    }
+    
+    try {
+      // 解析cleanText为JSON对象
+      const parsedJson = JSON.parse(cleanText);
+      // 生成JSON Schema
+      return generateSchema(parsedJson);
+    } catch (error) {
+      console.error('生成JSON Schema时出错:', error);
+      console.error('清理后的文本:', cleanText);
+      // 如果解析失败，返回一个通用的JSON对象Schema
+      return {
+        "type": "object",
+        "additionalProperties": true
+      };
+    }
+  }
+
   // 使用AI生成Mock数据
   async generateMockData(responseText) {
     if (!this.isSupported) {
@@ -140,26 +245,56 @@ ${responseText}
       // 生成提示
       const prompt = this.generatePrompt(responseText);
       
-      // 使用AI生成mock数据
-      const aiResponse = await this.aiSession.prompt(prompt);
+      // 生成JSON Schema用于responseConstraint
+      const schema = this.generateJsonSchema(responseText);
+      
+      // 使用AI生成mock数据，添加responseConstraint参数
+      const aiResponse = await this.aiSession.prompt(prompt, {
+        responseConstraint: schema
+      });
       
       // 提取响应文本
       let generatedText = aiResponse;
-      // let generatedText = '';
-      // for (const part of aiResponse.parts) {
-      //   if (part.text) {
-      //     generatedText += part.text;
-      //   }
-      // }
       
       // 清理响应文本（移除任何Markdown、额外文本和注释）
       let cleanText = generatedText.replace(/```json|```/g, '').trim();
       
-      // Further clean up: remove any remaining /* */ comments
+      // 1. 移除/* */注释
       cleanText = cleanText.replace(/\/\*.*?\*\//gs, '').trim();
       
-      // 解析生成的JSON
-      const generatedMock = JSON.parse(cleanText);
+      // 2. 移除所有@开头的字段，无论其值是什么
+      cleanText = cleanText.replace(/\s*"@[^"]+"\s*:\s*"[^"]*"\s*,?\s*/g, '');
+      cleanText = cleanText.replace(/\s*"@[^"]+"\s*:\s*[^,\}\]]+\s*,?\s*/g, '');
+      
+      // 3. 移除" "字段
+      cleanText = cleanText.replace(/\s*" "\s*:\s*""\s*,?\s*/g, '');
+      
+      // 4. 移除末尾可能的多余逗号
+      cleanText = cleanText.replace(/,\s*}/g, '}');
+      cleanText = cleanText.replace(/,\s*\]/g, ']');
+      
+      // 5. 解析JSON对象
+      let generatedMock = JSON.parse(cleanText);
+      
+      // 递归清理生成的JSON对象，移除所有" "字段
+      function cleanJson(obj) {
+        if (Array.isArray(obj)) {
+          return obj.map(item => cleanJson(item));
+        } else if (obj !== null && typeof obj === 'object') {
+          const cleaned = {};
+          for (const [key, value] of Object.entries(obj)) {
+            if (key !== ' ') {
+              cleaned[key] = cleanJson(value);
+            }
+          }
+          return cleaned;
+        } else {
+          return obj;
+        }
+      }
+      
+      // 清理生成的JSON对象
+      generatedMock = cleanJson(generatedMock);
       
       // 确保ErrorModule和ErrorCode为0
       if (generatedMock.ResponseStatus) {

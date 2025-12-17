@@ -140,6 +140,22 @@ input[type="text"]:focus, textarea:focus, select:focus {
   box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
 }
 
+/* 禁用状态样式 */
+input[type="text"]:disabled, textarea:disabled, select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: #f5f5f5;
+  color: #999;
+}
+
+/* 禁用按钮样式 */
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 textarea {
   resize: vertical;
   min-height: 80px;
@@ -449,7 +465,7 @@ button:disabled {
   width: auto;
   min-width: 60px;
   max-width: 150px;
-  padding: 2px 4px;
+  padding: 2px 4px !important;
   border: 1px solid #667eea;
   border-radius: 3px;
   font-family: 'Fira Code', 'Consolas', monospace;

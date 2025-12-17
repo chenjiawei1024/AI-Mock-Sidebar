@@ -12,6 +12,7 @@ const savedMocksList = document.getElementById('savedMocksList');
 const globalToggle = document.getElementById('globalToggle');
 const harFileInput = document.getElementById('harFileInput');
 const harImportBtn = document.querySelector('.har-import');
+const submitMockBtn = document.getElementById('submitMockBtn');
 const aiMockBtn = document.getElementById('aiMockBtn');
 
 // 模拟数据生成函数 - 现在返回真实响应的原始数据
@@ -617,21 +618,7 @@ function enableKeyEditMode(element, key, rootData, path) {
   input.className = 'json-key-input';
   input.type = 'text';
   input.value = key;
-  
-  // 设置输入框样式
   input.style.width = 'auto';
-  input.style.minWidth = '60px';
-  input.style.padding = '2px 4px';
-  input.style.border = '1px solid #667eea';
-  input.style.borderRadius = '3px';
-  input.style.fontFamily = 'inherit';
-  input.style.fontSize = 'inherit';
-  input.style.color = '#986801';
-  input.style.fontWeight = '600';
-  input.style.background = 'white';
-  input.style.outline = 'none';
-  input.style.boxShadow = '0 0 0 2px rgba(102, 126, 234, 0.2)';
-  input.style.boxSizing = 'border-box';
   
   // 替换内容
   element.innerHTML = '';
@@ -1083,6 +1070,14 @@ mockForm.addEventListener('submit', (e) => {
   submitBtn.textContent = 'Generating...';
   submitBtn.disabled = true;
   
+  // 禁用AI生成模拟按钮
+  aiMockBtn.disabled = true;
+  
+  // 禁用其他相关控件，防止在生成过程中修改
+  urlInput.disabled = true;
+  methodSelect.disabled = true;
+  responseInput.disabled = true;
+  
   // Process URL to support both formats
   const processedUrl = processUrl(originalUrl, selectedMethod);
   
@@ -1091,6 +1086,15 @@ mockForm.addEventListener('submit', (e) => {
   if (!responseStructure) {
     submitBtn.textContent = originalText;
     submitBtn.disabled = false;
+    
+    // 恢复AI生成模拟按钮
+    aiMockBtn.disabled = false;
+    
+    // 恢复其他相关控件
+    urlInput.disabled = false;
+    methodSelect.disabled = false;
+    responseInput.disabled = false;
+    
     return;
   }
   
@@ -1119,9 +1123,16 @@ mockForm.addEventListener('submit', (e) => {
     responseStructure // Save original structure for generating new array items
   };
   
-  // Restore button state
+  // Restore all controls state
   submitBtn.textContent = originalText;
   submitBtn.disabled = false;
+  // 恢复AI生成模拟按钮
+  aiMockBtn.disabled = false;
+  
+  // 恢复其他相关控件
+  urlInput.disabled = false;
+  methodSelect.disabled = false;
+  responseInput.disabled = false;
 });
 
 saveMockBtn.addEventListener('click', () => {
@@ -1539,6 +1550,12 @@ async function handleAIMockClick() {
     // 显示加载状态
     aiMockBtn.textContent = '生成中...';
     aiMockBtn.disabled = true;
+    submitMockBtn.disabled = true;
+    
+    // 禁用其他相关控件，防止在生成过程中修改
+    urlInput.disabled = true;
+    methodSelect.disabled = true;
+    responseInput.disabled = true;
     
     // 使用AI生成模拟数据
     const generatedMock = await aiMock.generateMockData(responseText);
@@ -1567,9 +1584,15 @@ async function handleAIMockClick() {
     console.error('生成AI mock数据时出错:', error);
     showErrorMessage(error.message);
   } finally {
-    // 恢复按钮状态
+    // 恢复所有控件状态
     aiMockBtn.textContent = 'AI 生成模拟';
     aiMockBtn.disabled = false;
+    submitMockBtn.disabled = false;
+    
+    // 恢复其他相关控件
+    urlInput.disabled = false;
+    methodSelect.disabled = false;
+    responseInput.disabled = false;
   }
 }
 
