@@ -11,9 +11,13 @@ const saveMockBtn = document.getElementById('saveMockBtn');
 const savedMocksList = document.getElementById('savedMocksList');
 const globalToggle = document.getElementById('globalToggle');
 const harFileInput = document.getElementById('harFileInput');
-const harImportBtn = document.querySelector('.har-import');
+const harImportBtn = document.getElementById('harImportBtn');
 const submitMockBtn = document.getElementById('submitMockBtn');
 const aiMockBtn = document.getElementById('aiMockBtn');
+const toggleEditModeBtn = document.getElementById('toggleEditModeBtn');
+const rawJsonContainer = document.getElementById('rawJsonContainer');
+const rawJsonInput = document.getElementById('rawJsonInput');
+const cancelEditBtn = document.getElementById('cancelEditBtn');
 
 // 模拟数据生成函数 - 现在返回真实响应的原始数据
 function generateMockData(structure) {
@@ -721,15 +725,67 @@ function getObjectByPath(obj, path) {
     if (arrayMatch) {
       const arrayName = arrayMatch[1];
       const index = parseInt(arrayMatch[2]);
-      current = current[arrayName][index];
+      if (current[arrayName] && current[arrayName][index] !== undefined) {
+        current = current[arrayName][index];
+      } else {
+        break;
+      }
     } else {
-      current = current[part];
+      if (current[part] !== undefined) {
+        current = current[part];
+      } else {
+        break;
+      }
     }
-    
-    if (current === undefined) break;
   }
   
   return current;
+}
+
+// 通过路径获取父对象和属性名
+function getParentAndProperty(obj, path) {
+  if (!path) return { parent: null, property: null };
+  
+  const pathParts = path.split('.');
+  let parent = obj;
+  let current = obj;
+  
+  for (let i = 0; i < pathParts.length; i++) {
+    const part = pathParts[i];
+    const isLast = i === pathParts.length - 1;
+    
+    if (isLast) {
+      // 检查最后一个部分是否是数组索引
+      const arrayMatch = part.match(/(\w+)\[(\d+)\]/);
+      if (arrayMatch) {
+        const arrayName = arrayMatch[1];
+        const index = parseInt(arrayMatch[2]);
+        return { parent: current[arrayName], property: index };
+      }
+      return { parent, property: part };
+    }
+    
+    const arrayMatch = part.match(/(\w+)\[(\d+)\]/);
+    if (arrayMatch) {
+      const arrayName = arrayMatch[1];
+      const index = parseInt(arrayMatch[2]);
+      if (current[arrayName] && current[arrayName][index] !== undefined) {
+        parent = current[arrayName][index];
+        current = parent;
+      } else {
+        break;
+      }
+    } else {
+      if (current[part] !== undefined) {
+        parent = current[part];
+        current = parent;
+      } else {
+        break;
+      }
+    }
+  }
+  
+  return { parent, property: null };
 }
 
 // 添加空字段
@@ -819,8 +875,40 @@ function addEmptyField(obj, container, rootData, path, index) {
       // 获取父对象
       const parentObj = path ? getObjectByPath(rootData, path) : rootData;
       
+      // 确保新字段插入到用户点击的位置
+      // 获取父对象的所有键
+      const keys = Object.keys(parentObj);
+      
+      // 创建新的对象，保持原有顺序并插入新字段
+      const newParentObj = {};
+      
+      // 先添加索引前的所有键
+      for (let i = 0; i < index; i++) {
+        if (keys[i]) {
+          newParentObj[keys[i]] = parentObj[keys[i]];
+        }
+      }
+      
       // 添加新字段
-      parentObj[key] = parsedValue;
+      newParentObj[key] = parsedValue;
+      
+      // 添加索引后的所有键
+      for (let i = index; i < keys.length; i++) {
+        newParentObj[keys[i]] = parentObj[keys[i]];
+      }
+      
+      // 更新父对象
+      if (path) {
+        // 如果是嵌套对象，更新父对象中的属性
+        const { parent, property } = getParentAndProperty(rootData, path);
+        if (parent && property) {
+          parent[property] = newParentObj;
+        }
+      } else {
+        // 如果是根对象，直接替换所有属性
+        Object.keys(rootData).forEach(k => delete rootData[k]);
+        Object.assign(rootData, newParentObj);
+      }
       
       // 重新渲染编辑器
       renderMockDataEditor(rootData, mockDataContainer);
@@ -903,13 +991,13 @@ function renderSavedMocks() {
       urlInfoContainer.className = 'url-info-container';
       
       // 处理URL以仅显示带ID占位符的路径
-      let displayUrl = mock.originalUrl || mock.url;
+      let displayUrl = mock.url || mock.originalUrl || '';
       try {
         // 检查URL是否包含<ID>或类似占位符
         const hasPlaceholders = /<[^>]+>/.test(displayUrl);
         
         // 从mock的原始URL中提取MT参数（如果可用）
-        let mtParam = 'GET';
+        let mtParamFromUrl = '';
         let path = '';
         
         // 尝试从URL中提取MT参数，无论是否有占位符
@@ -917,9 +1005,13 @@ function renderSavedMocks() {
           const queryPart = displayUrl.split('?')[1];
           const mtMatch = queryPart.match(/MT=([^&]+)/);
           if (mtMatch) {
-            mtParam = mtMatch[1].toUpperCase();
+            mtParamFromUrl = mtMatch[1].toUpperCase();
           }
         }
+        
+        // 优先级：URL的MT参数 || mock.method || 'GET'
+        let mtParam = mtParamFromUrl || mock.method || 'GET';
+        mtParam = mtParam.toUpperCase();
         
         if (hasPlaceholders) {
           // 特殊处理带有占位符的URL以保留它们
@@ -935,19 +1027,211 @@ function renderSavedMocks() {
           path = path.replace(/\/\d+(?=\/|$)/g, '/<ID>');
         }
         
+        // 将*替换为<ID>，让用户看到更友好的占位符
+        path = path.replace(/\*/g, '<ID>');
+        
         // 创建URL显示元素
         const mockUrl = document.createElement('div');
         mockUrl.className = 'mock-url';
         mockUrl.textContent = path;
+        mockUrl.dataset.mockId = mock.id;
+        mockUrl.dataset.url = path;
         
-        // 创建方法徽章
-        const methodBadge = document.createElement('span');
-        methodBadge.className = `method-badge ${mtParam.toLowerCase()}`;
-        methodBadge.textContent = mtParam;
+        // 添加点击事件，切换为输入框
+        mockUrl.addEventListener('click', (e) => {
+          const parent = mockUrl.parentElement;
+          const sibling = mockUrl.nextElementSibling;
+          const mockId = mockUrl.dataset.mockId;
+          const currentUrl = mockUrl.dataset.url;
+          
+          // 移除原URL显示元素
+          mockUrl.remove();
+          
+          // 创建输入框
+          const urlInput = document.createElement('input');
+          urlInput.type = 'text';
+          urlInput.className = 'mock-url-input-direct';
+          urlInput.value = currentUrl;
+          urlInput.dataset.mockId = mockId;
+          
+          // 添加到容器，保持原位置
+          if (sibling) {
+            parent.insertBefore(urlInput, sibling);
+          } else {
+            parent.appendChild(urlInput);
+          }
+          
+          // 聚焦输入框
+          urlInput.focus();
+          urlInput.select();
+          
+          // 添加失焦事件，保存修改
+          urlInput.addEventListener('blur', (e) => {
+            const newUrl = e.target.value.trim();
+            const mockId = e.target.dataset.mockId;
+            const inputElement = e.target;
+            const parentElement = inputElement.parentElement;
+            const nextSibling = inputElement.nextElementSibling;
+            
+            // 移除输入框
+            inputElement.remove();
+            
+            // 创建新的URL显示元素
+            const newMockUrl = document.createElement('div');
+            newMockUrl.className = 'mock-url';
+            newMockUrl.textContent = newUrl;
+            newMockUrl.dataset.mockId = mockId;
+            newMockUrl.dataset.url = newUrl;
+            
+            // 添加点击事件，切换为输入框
+            newMockUrl.addEventListener('click', (e) => {
+              const parent = newMockUrl.parentElement;
+              const sibling = newMockUrl.nextElementSibling;
+              const mockId = newMockUrl.dataset.mockId;
+              const currentUrl = newMockUrl.dataset.url;
+              
+              // 移除原URL显示元素
+              newMockUrl.remove();
+              
+              // 创建输入框
+              const urlInput = document.createElement('input');
+              urlInput.type = 'text';
+              urlInput.className = 'mock-url-input-direct';
+              urlInput.value = currentUrl;
+              urlInput.dataset.mockId = mockId;
+              
+              // 添加到容器，保持原位置
+              if (sibling) {
+                parent.insertBefore(urlInput, sibling);
+              } else {
+                parent.appendChild(urlInput);
+              }
+              
+              // 聚焦输入框
+              urlInput.focus();
+              urlInput.select();
+              
+              // 添加失焦事件，保存修改
+              urlInput.addEventListener('blur', (e) => {
+                const newUrl = e.target.value.trim();
+                const mockId = e.target.dataset.mockId;
+                const inputElement = e.target;
+                const parentElement = inputElement.parentElement;
+                const nextSibling = inputElement.nextElementSibling;
+                
+                // 移除输入框
+                inputElement.remove();
+                
+                // 创建新的URL显示元素
+                const newMockUrl = document.createElement('div');
+                newMockUrl.className = 'mock-url';
+                newMockUrl.textContent = newUrl;
+                newMockUrl.dataset.mockId = mockId;
+                newMockUrl.dataset.url = newUrl;
+                
+                // 添加点击事件（递归调用）
+                newMockUrl.addEventListener('click', arguments.callee);
+                
+                // 添加到容器，保持原位置
+                if (nextSibling) {
+                  parentElement.insertBefore(newMockUrl, nextSibling);
+                } else {
+                  parentElement.appendChild(newMockUrl);
+                }
+                
+                // 判断URL是否真的修改了
+                if (newUrl !== currentUrl) {
+                  // 更新mock数据
+                  chrome.runtime.sendMessage({ action: 'updateMockUrl', mockId, newUrl }, (response) => {
+                    if (response.success) {
+                      // 重新渲染模拟列表
+                      renderSavedMocks();
+                    }
+                  });
+                }
+              });
+              
+              // 添加回车键事件，保存修改
+              urlInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                  urlInput.blur();
+                }
+              });
+            });
+            
+            // 添加到容器，保持原位置
+            if (nextSibling) {
+              parentElement.insertBefore(newMockUrl, nextSibling);
+            } else {
+              parentElement.appendChild(newMockUrl);
+            }
+            
+            // 判断URL是否真的修改了
+            if (newUrl !== currentUrl) {
+              // 更新mock数据
+              chrome.runtime.sendMessage({ action: 'updateMockUrl', mockId, newUrl }, (response) => {
+                if (response.success) {
+                  // 重新渲染模拟列表
+                  renderSavedMocks();
+                }
+              });
+            }
+          });
+          
+          // 添加回车键事件，保存修改
+          urlInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+              urlInput.blur();
+            }
+          });
+        });
+        
+        // 创建方法选择容器
+        const methodContainer = document.createElement('div');
+        methodContainer.className = 'method-select-container';
+        
+        // 创建方法下拉选择器
+        const methodSelect = document.createElement('select');
+        methodSelect.className = 'method-dropdown';
+        methodSelect.dataset.mockId = mock.id;
+        
+        // 添加请求方法选项
+        const methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
+        methods.forEach(method => {
+          const option = document.createElement('option');
+          option.value = method;
+          option.textContent = method;
+          if (method === mtParam) {
+            option.selected = true;
+          }
+          methodSelect.appendChild(option);
+        });
+        
+        // 添加样式类，根据当前方法设置不同颜色
+        methodSelect.className = `method-dropdown method-${mtParam.toLowerCase()}`;
+        
+        // 添加事件监听器，处理方法变化
+        methodSelect.addEventListener('change', (e) => {
+          const newMethod = e.target.value;
+          const mockId = e.target.dataset.mockId;
+          const selectElement = e.target;
+          
+          // 更新选择器样式，防止点击后标签消失
+          selectElement.className = `method-dropdown method-${newMethod.toLowerCase()}`;
+          
+          // 更新mock数据
+          chrome.runtime.sendMessage({ action: 'updateMockMethod', mockId, newMethod }, (response) => {
+            if (response.success) {
+              // 重新渲染模拟列表
+              renderSavedMocks();
+            }
+          });
+        });
         
         // 添加到容器
+        methodContainer.appendChild(methodSelect);
         urlInfoContainer.appendChild(mockUrl);
-        urlInfoContainer.appendChild(methodBadge);
+        urlInfoContainer.appendChild(methodContainer);
       } catch (error) {
         // 无效URL的回退处理
         const mockUrl = document.createElement('div');
@@ -1138,14 +1422,39 @@ mockForm.addEventListener('submit', (e) => {
 saveMockBtn.addEventListener('click', () => {
   if (!window.currentMock) return;
   
-  // Update mock data from editor
-  const updatedMockData = updateMockDataFromEditor(window.currentMock.mockData, mockDataContainer);
+  let updatedMockData = window.currentMock.mockData;
+  
+  // 检查当前编辑模式，如果是原始JSON模式，先解析JSON
+  if (rawJsonContainer.style.display !== 'none') {
+    try {
+      const jsonString = rawJsonInput.value.trim();
+      updatedMockData = JSON.parse(jsonString);
+      // 更新全局mock数据
+      window.currentMock.mockData = updatedMockData;
+    } catch (error) {
+      console.error('解析JSON失败:', error);
+      showErrorMessage('保存失败。请检查JSON格式。');
+      return;
+    }
+  } else {
+    // 如果是自定义编辑器模式，更新模拟数据
+    updatedMockData = updateMockDataFromEditor(window.currentMock.mockData, mockDataContainer);
+  }
+  
+  // 重新处理URL，确保包含最新的请求方法
+  const reprocessedUrl = processUrl(window.currentMock.originalUrl, window.currentMock.method);
+  
+  // 从reprocessedUrl中提取pathname，去掉MT参数，用于保存到mock.url
+  const urlObj = new URL(reprocessedUrl, 'http://example.com');
+  const cleanPath = urlObj.pathname;
   
   // Create mock object with 32-bit integer ID (1 to 2147483647)
+  // 保存cleanPath到mock.url，去掉了http头和MT参数
+  // 保留originalUrl用于编辑回填，确保用户体验一致
   const mock = {
     id: window.currentMock.id || (Date.now() + Math.random() * 1000).toString().replace('.', ''),
     originalUrl: window.currentMock.originalUrl,
-    url: window.currentMock.url,
+    url: cleanPath,
     method: window.currentMock.method,
     mockData: updatedMockData,
     enabled: true
@@ -1203,6 +1512,13 @@ saveMockBtn.addEventListener('click', () => {
       mockForm.reset();
       mockDataSection.style.display = 'none';
       window.currentMock = null;
+      
+      // 显示新建模拟表单，恢复正常状态
+      const formSection = document.querySelector('.form-section');
+      if (formSection) {
+        formSection.style.display = 'block';
+      }
+      
       renderSavedMocks();
     } else {
         alert('保存模拟失败。请重试。');
@@ -1216,18 +1532,29 @@ saveMockBtn.addEventListener('click', () => {
 
 // Edit mock function
 function editMock(mock) {
-  // Populate form fields with mock data
-  urlInput.value = mock.originalUrl || mock.url;
-  
-  // Extract method from MT parameter or use default GET
-  let method = 'GET';
-  if (mock.url) {
-    const urlObj = new URL(mock.url, 'http://example.com');
-    const mtParam = urlObj.searchParams.get('MT');
-    if (mtParam) {
-      method = mtParam.toUpperCase();
-    }
+  // 隐藏新建模拟表单
+  const formSection = document.querySelector('.form-section');
+  if (formSection) {
+    formSection.style.display = 'none';
   }
+  
+  // Populate form fields with mock data
+  // 使用cleanPath填充URL输入框，去掉http头和MT参数
+  let urlToDisplay = mock.url; // mock.url已经是cleanPath了
+  
+  // 将*替换为<ID>，让用户看到更友好的占位符
+  urlToDisplay = urlToDisplay.replace(/\*/g, '<ID>');
+  
+  urlInput.value = urlToDisplay;
+  
+  // Extract method with correct priority: mock.method || URL's MT parameter || 'GET'
+  let method = 'GET';
+  
+  // 优先使用mock对象的method属性
+  if (mock.method) {
+    method = mock.method;
+  }
+  
   methodSelect.value = method;
   
   // Convert mock data to JSON string for response input
@@ -1257,7 +1584,7 @@ function editMock(mock) {
     id: mock.id,
     originalUrl: mock.originalUrl || mock.url,
     url: mock.url,
-    method: mock.method || method, // Use saved method or extracted method
+    method: method, // 使用当前选择的方法
     mockData,
     responseStructure
   };
@@ -1296,6 +1623,11 @@ function toggleSavedMocksVisibility(show) {
 
 // 初始化HAR导入功能
 function initHarImport() {
+  // 为HAR导入按钮添加点击事件，触发文件选择对话框
+  harImportBtn.addEventListener('click', () => {
+    harFileInput.click();
+  });
+  
   // 处理HAR文件选择
   harFileInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
@@ -1413,11 +1745,15 @@ function extractMocksFromHar(harData) {
       // 处理URL以匹配我们的模拟格式
       const processedUrl = processUrl(url, mtParam);
       
+      // 从processedUrl中提取cleanPath，去掉MT参数
+      const urlObj = new URL(processedUrl, 'http://example.com');
+      const cleanPath = urlObj.pathname;
+      
       // 创建模拟对象
       const mock = {
         id: (Date.now() + Math.random() * 1000).toString().replace('.', ''),
         originalUrl: url,
-        url: processedUrl,
+        url: cleanPath, // 保存cleanPath，去掉http头和MT参数
         method: mtParam.toUpperCase(), // 对HAR导入使用MT参数值作为方法
         mockData,
         enabled: true
@@ -1518,6 +1854,63 @@ function showErrorMessage(message) {
 // 创建AIMock实例
 const aiMock = new AIMock();
 
+// 初始化删除全部图标事件监听器
+function initDeleteAllBtn() {
+  const deleteAllBtn = document.getElementById('deleteAllMocksBtn');
+  if (deleteAllBtn) {
+    deleteAllBtn.addEventListener('click', () => {
+      // 显示确认对话框
+      if (confirm('确定要删除所有已保存的模拟吗？此操作不可撤销。')) {
+        // 发送消息到background.js删除所有模拟
+        chrome.runtime.sendMessage({ action: 'deleteAllMocks' }, (response) => {
+          if (response.success) {
+            // 刷新模拟列表
+            renderSavedMocks();
+            // 显示成功消息
+            showSuccessMessage('所有模拟已成功删除');
+          } else {
+            showErrorMessage('删除模拟失败。请重试。');
+          }
+        });
+      }
+    });
+  }
+}
+
+// 初始化取消编辑按钮事件监听器
+function initCancelEditBtn() {
+  if (cancelEditBtn) {
+    cancelEditBtn.addEventListener('click', () => {
+      // 重置表单
+      mockForm.reset();
+      
+      // 隐藏模拟数据编辑区域
+      mockDataSection.style.display = 'none';
+      
+      // 清除当前编辑的mock数据
+      window.currentMock = null;
+      
+      // 显示新建模拟表单
+      const formSection = document.querySelector('.form-section');
+      if (formSection) {
+        formSection.style.display = 'block';
+      }
+    });
+  }
+}
+
+// 初始化所有控件
+document.addEventListener('DOMContentLoaded', () => {
+  // 初始化全局模拟开关
+  initGlobalToggle();
+  // 初始化删除全部按钮
+  initDeleteAllBtn();
+  // 初始化取消编辑按钮
+  initCancelEditBtn();
+  // 渲染已保存的模拟
+  renderSavedMocks();
+});
+
 // 初始化AI Mock功能
 async function initAIMock() {
   const supportResult = await aiMock.checkSupport();
@@ -1534,7 +1927,9 @@ async function initAIMock() {
   } else {
     // 如果不支持，禁用AI模拟按钮
     aiMockBtn.disabled = true;
-    showErrorMessage(supportResult.error);
+    if (supportResult.error) {
+      showErrorMessage(supportResult.error);
+    }
   }
 }
 
@@ -1601,8 +1996,24 @@ async function init() {
   renderSavedMocks();
   initGlobalToggle();
   initHarImport();
-  await initAIMock();
-  
+  initCancelEditBtn();
+  initAIMock();
+
+  // 添加实时更新currentMock的事件监听器
+  // 监听请求方法变化
+  methodSelect.addEventListener('change', () => {
+    if (window.currentMock) {
+      window.currentMock.method = methodSelect.value;
+    }
+  });
+
+  // 监听URL输入变化
+  // urlInput.addEventListener('input', () => {
+  //   if (window.currentMock) {
+  //     window.currentMock.originalUrl = urlInput.value.trim();
+  //   }
+  // });
+
   // 添加URL输入框失去焦点事件监听器，根据MT参数自动更新方法选择
   urlInput.addEventListener('blur', () => {
     const originalUrl = urlInput.value;
@@ -1648,6 +2059,62 @@ async function init() {
       // 静默失败，不更新方法选择
     }
   });
+  
+  // 添加切换编辑模式的事件监听器
+  toggleEditModeBtn.addEventListener('click', () => {
+    toggleEditMode();
+  });
+}
+
+// 切换编辑模式：自定义编辑器 <-> 原始JSON输入
+function toggleEditMode() {
+  // 检查当前模式
+  const isCustomEditorVisible = mockDataContainer.style.display !== 'none';
+  
+  if (isCustomEditorVisible) {
+    // 从自定义编辑器切换到原始JSON
+    try {
+      // 将自定义编辑器的数据转换为JSON字符串
+      const mockData = window.currentMock.mockData;
+      const jsonString = JSON.stringify(mockData, null, 2);
+      
+      // 更新原始JSON输入框
+      rawJsonInput.value = jsonString;
+      
+      // 隐藏自定义编辑器，显示原始JSON输入框
+      mockDataContainer.style.display = 'none';
+      rawJsonContainer.style.display = 'block';
+      
+      // 更新按钮文本
+      toggleEditModeBtn.textContent = '切换到可视化编辑';
+    } catch (error) {
+      console.error('切换到原始JSON失败:', error);
+      showErrorMessage('切换到原始JSON失败。请检查模拟数据格式。');
+    }
+  } else {
+    // 从原始JSON切换到自定义编辑器
+    try {
+      // 解析原始JSON
+      const jsonString = rawJsonInput.value.trim();
+      const mockData = JSON.parse(jsonString);
+      
+      // 更新全局mock数据
+      window.currentMock.mockData = mockData;
+      
+      // 隐藏原始JSON输入框，显示自定义编辑器
+      rawJsonContainer.style.display = 'none';
+      mockDataContainer.style.display = 'block';
+      
+      // 重新渲染自定义编辑器
+      renderMockDataEditor(mockData, mockDataContainer);
+      
+      // 更新按钮文本
+      toggleEditModeBtn.textContent = '切换到原始JSON';
+    } catch (error) {
+      console.error('切换到可视化编辑失败:', error);
+      showErrorMessage('切换到可视化编辑失败。请检查JSON格式。');
+    }
+  }
 }
 
 // 开始初始化所有功能

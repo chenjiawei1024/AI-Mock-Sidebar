@@ -58,8 +58,11 @@ async function updateRules() {
       }
     }
     
-    // 使用mock.method（如果可用），否则使用mtParam
+    // 优先使用mock.method，mtParam作为备选
     const requestMethod = mock.method || mtParam || 'GET';
+    
+    // 确保mtParam使用requestMethod的值，因为mock.url可能已经没有MT参数了
+    mtParam = requestMethod;
     
     // 创建匹配任何源 + 路径的URL过滤器
     // * 前缀匹配任何协议 + 域 + 端口
@@ -80,21 +83,22 @@ async function updateRules() {
     let fullUrlFilter = urlFilter;
     
     // 如果存在MT参数，添加精确匹配
-    if (mtParam) {
+    if (requestMethod) {
       // 使用类似正则的语法匹配精确的MT参数
       // 确保MT参数值完全匹配
       // 仅在不存在?时添加?
       const separator = fullUrlFilter.includes('?') ? '&' : '?';
-      fullUrlFilter = `${fullUrlFilter}${separator}MT=${mtParam}*`;
+      fullUrlFilter = `${fullUrlFilter}${separator}MT=${requestMethod}*`;
     }
     
     // 获取HTTP请求方法 - 转换为小写以符合Chrome API要求
-    const httpMethod = requestMethod.toLowerCase();
+    // 注意：项目请求协议永远是POST，只会在URL参数MT上传入真实的请求类型
+    const httpMethod = 'post'; // 硬编码为post，因为实际HTTP请求方法总是POST
     
     const condition = {
       urlFilter: fullUrlFilter, // 匹配包含MT参数的精确路径
       resourceTypes: ['xmlhttprequest'],
-      requestMethods: [httpMethod] // 使用实际请求方法，项目请求协议永远是post，只会在url参数MT上传入真实的请求类型，以确保安全性
+      requestMethods: [httpMethod] // 硬编码为post，因为实际HTTP请求方法总是POST
     };
     
     // 确保ID是有效的32位整数（1到2147483647）
@@ -166,6 +170,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'deleteMock':
       deleteMock(message.mockId).then(sendResponse);
       return true;
+    case 'deleteAllMocks':
+      deleteAllMocks().then(sendResponse);
+      return true;
     case 'getMocks':
       getMocks().then(sendResponse);
       return true;
@@ -175,8 +182,56 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'setGlobalState':
       setGlobalState(message.enabled).then(sendResponse);
       return true;
+    case 'updateMockMethod':
+      updateMockMethod(message.mockId, message.newMethod).then(sendResponse);
+      return true;
+    case 'updateMockUrl':
+      updateMockUrl(message.mockId, message.newUrl).then(sendResponse);
+      return true;
   }
 });
+
+// 更新模拟的请求方法
+async function updateMockMethod(mockId, newMethod) {
+  const { mocks } = await chrome.storage.local.get(['mocks']);
+  const mockIndex = mocks.findIndex(m => m.id === mockId);
+  
+  if (mockIndex !== -1) {
+    mocks[mockIndex].method = newMethod;
+    await chrome.storage.local.set({ mocks });
+    await updateRules();
+    return { success: true, mocks };
+  }
+  
+  return { success: false };
+}
+
+// 更新模拟的URL
+async function updateMockUrl(mockId, newUrl) {
+  const { mocks } = await chrome.storage.local.get(['mocks']);
+  const mockIndex = mocks.findIndex(m => m.id === mockId);
+  
+  if (mockIndex !== -1) {
+    // 获取旧URL，用于比较
+    const oldUrl = mocks[mockIndex].url;
+    
+    // 替换URL中的<ID>为*，用于内部处理
+    const processedUrl = newUrl.replace(/<[^>]+>/g, '*');
+    
+    mocks[mockIndex].url = processedUrl;
+    
+    await chrome.storage.local.set({ mocks });
+    
+    // 只有当URL真正改变时，才更新规则
+    if (processedUrl !== oldUrl) {
+      await updateRules();
+    }
+    
+    return { success: true, mocks };
+  }
+  
+  return { success: false };
+}
 
 // 全局状态辅助函数
 async function getGlobalState() {
@@ -233,6 +288,11 @@ async function deleteMock(mockId) {
   const updatedMocks = mocks.filter(m => m.id !== mockId);
   await chrome.storage.local.set({ mocks: updatedMocks });
   return { success: true, mocks: updatedMocks };
+}
+
+async function deleteAllMocks() {
+  await chrome.storage.local.set({ mocks: [] });
+  return { success: true, mocks: [] };
 }
 
 async function getMocks() {

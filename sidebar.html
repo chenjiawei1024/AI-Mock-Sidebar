@@ -70,10 +70,17 @@
         
         <!-- 生成的模拟数据 -->
         <div class="mock-data-section" style="display: none;">
-            <h2>生成的模拟数据</h2>
+            <div class="section-header">
+                <h2>生成的模拟数据</h2>
+                <button id="toggleEditModeBtn" class="toggle-edit-btn">切换到原始JSON</button>
+            </div>
             <div id="mockDataContainer"></div>
+            <div id="rawJsonContainer" style="display: none;">
+                <textarea id="rawJsonInput" class="raw-json-input" rows="15"></textarea>
+            </div>
             <div class="form-actions">
                 <button id="saveMockBtn">保存模拟</button>
+                <button id="cancelEditBtn" type="button">取消</button>
             </div>
         </div>
         
@@ -88,11 +95,19 @@
                     <input type="checkbox" id="globalToggle" checked>
                 </div>
                 
-                <div class="har-import">
-                    <label for="harFileInput" class="har-import-icon" title="导入HAR">
-                        <img src="icons/导入HAR.png" alt="导入HAR" width="24" height="24">
-                    </label>
-                    <input type="file" id="harFileInput" accept=".har" style="display: none;">
+                <div class="icon-controls">
+                    <div class="har-import">
+                        <button id="harImportBtn" class="har-import-icon" title="导入HAR">
+                            <img src="icons/导入HAR.png" alt="导入HAR" width="24" height="24">
+                        </button>
+                        <input type="file" id="harFileInput" accept=".har" style="display: none;">
+                    </div>
+                    
+                    <div class="delete-all">
+                        <button id="deleteAllMocksBtn" class="delete-all-icon" title="删除全部">
+                            <img src="icons/删除.png" alt="删除全部" width="24" height="24">
+                        </button>
+                    </div>
                 </div>
             </div>
             
