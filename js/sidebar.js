@@ -1907,9 +1907,24 @@ document.addEventListener('DOMContentLoaded', () => {
   initDeleteAllBtn();
   // 初始化取消编辑按钮
   initCancelEditBtn();
+  // 初始化查看手册按钮
+  initViewReadmeBtn();
   // 渲染已保存的模拟
   renderSavedMocks();
 });
+
+// 初始化查看手册按钮
+function initViewReadmeBtn() {
+  const viewReadmeBtn = document.getElementById('viewReadmeBtn');
+  if (viewReadmeBtn) {
+    viewReadmeBtn.addEventListener('click', () => {
+      // 在新标签页打开README.md
+      chrome.tabs.create({
+        url: chrome.runtime.getURL('README.pdf')
+      });
+    });
+  }
+}
 
 // 初始化AI Mock功能
 async function initAIMock() {

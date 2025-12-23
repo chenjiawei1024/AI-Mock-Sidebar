@@ -160,35 +160,44 @@ chrome.storage.onChanged.addListener((changes) => {
 
 // 处理来自侧边栏的消息
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  switch (message.action) {
-    case 'saveMock':
-      saveMock(message.mock).then(sendResponse);
-      return true;
-    case 'toggleMock':
-      toggleMock(message.mockId).then(sendResponse);
-      return true;
-    case 'deleteMock':
-      deleteMock(message.mockId).then(sendResponse);
-      return true;
-    case 'deleteAllMocks':
-      deleteAllMocks().then(sendResponse);
-      return true;
-    case 'getMocks':
-      getMocks().then(sendResponse);
-      return true;
-    case 'getGlobalState':
-      getGlobalState().then(sendResponse);
-      return true;
-    case 'setGlobalState':
-      setGlobalState(message.enabled).then(sendResponse);
-      return true;
-    case 'updateMockMethod':
-      updateMockMethod(message.mockId, message.newMethod).then(sendResponse);
-      return true;
-    case 'updateMockUrl':
-      updateMockUrl(message.mockId, message.newUrl).then(sendResponse);
-      return true;
-  }
+  (async () => {
+    try {
+      let result;
+      switch (message.action) {
+        case 'saveMock':
+          result = await saveMock(message.mock);
+          break;
+        case 'toggleMock':
+          result = await toggleMock(message.mockId);
+          break;
+        case 'deleteMock':
+          result = await deleteMock(message.mockId);
+          break;
+        case 'deleteAllMocks':
+          result = await deleteAllMocks();
+          break;
+        case 'getMocks':
+          result = await getMocks();
+          break;
+        case 'getGlobalState':
+          result = await getGlobalState();
+          break;
+        case 'setGlobalState':
+          result = await setGlobalState(message.enabled);
+          break;
+        case 'updateMockMethod':
+          result = await updateMockMethod(message.mockId, message.newMethod);
+          break;
+        case 'updateMockUrl':
+          result = await updateMockUrl(message.mockId, message.newUrl);
+          break;
+      }
+      sendResponse(result);
+    } catch (error) {
+      sendResponse({ success: false, error: error.message });
+    }
+  })();
+  return true;
 });
 
 // 更新模拟的请求方法
